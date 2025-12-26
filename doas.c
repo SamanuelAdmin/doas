@@ -58,7 +58,7 @@ static struct pam_conv pamc = { misc_conv, NULL };
 
 #elif defined(SOLARIS_PAM) /* illumos & Solaris */
 #include "pm_pam_conv.h"
-// static struct pam_conv pamc = { pam_tty_conv, NULL };
+
 #if defined(OMNIOS_PAM)
     static struct pam_conv pamc = { (int (*)(int, const struct pam_message **, struct pam_response **, void *))pam_tty_conv, NULL };
 #else
@@ -69,6 +69,8 @@ static struct pam_conv pamc = { misc_conv, NULL };
 #endif /* USE_PAM */
 
 #include "doas.h"
+
+
 
 static void 
 usage(void)
@@ -122,14 +124,14 @@ match(uid_t uid, gid_t *groups, int ngroups, uid_t target, const char *cmd,
 
 	if (r->ident[0] == ':') {
 		gid_t rgid;
-		if (parsegid(r->ident + 1, &rgid) == -1)
-			return 0;
+		
+		if (parsegid(r->ident + 1, &rgid) == -1) return 0;
+		
 		for (i = 0; i < ngroups; i++) {
-			if (rgid == groups[i])
-				break;
+			if (rgid == groups[i]) break;
 		}
-		if (i == ngroups)
-			return 0;
+		
+		if (i == ngroups) return 0;
 	} else {
 		if (uidcheck(r->ident, uid) != 0)
 			return 0;
@@ -137,18 +139,16 @@ match(uid_t uid, gid_t *groups, int ngroups, uid_t target, const char *cmd,
 	if (r->target && uidcheck(r->target, target) != 0)
 		return 0;
 	if (r->cmd) {
-		if (strcmp(r->cmd, cmd))
-			return 0;
+		if (strcmp(r->cmd, cmd)) return 0;
+		
 		if (r->cmdargs) {
 			/* if arguments were given, they should match explicitly */
 			for (i = 0; r->cmdargs[i]; i++) {
-				if (!cmdargs[i])
-					return 0;
-				if (strcmp(r->cmdargs[i], cmdargs[i]))
-					return 0;
+				if (!cmdargs[i]) return 0;
+				if (strcmp(r->cmdargs[i], cmdargs[i])) return 0;
 			}
-			if (cmdargs[i])
-				return 0;
+			
+			if (cmdargs[i]) return 0;
 		}
 	}
 	return 1;
@@ -166,10 +166,11 @@ permit(uid_t uid, gid_t *groups, int ngroups, struct rule **lastr,
 		    cmdargs, rules[i]))
 			*lastr = rules[i];
 	}
-	if (!*lastr)
-		return 0;
+	
+	if (!*lastr) return 0;
 	return (*lastr)->action == PERMIT;
 }
+
 
 static void
 parseconfig(const char *filename, int checkperms)
@@ -197,6 +198,7 @@ parseconfig(const char *filename, int checkperms)
 	if (parse_errors)
 		exit(1);
 }
+
 
 static void 
 checkconfig(const char *confpath, int argc, char **argv,
@@ -226,6 +228,7 @@ checkconfig(const char *confpath, int argc, char **argv,
 		exit(1);
 	}
 }
+
 
 #if defined(USE_BSD_AUTH)      
 static void
@@ -275,6 +278,7 @@ good:
 }
 #endif
 
+
 int
 main(int argc, char **argv)
 {
@@ -297,9 +301,11 @@ main(int argc, char **argv)
 	int nflag = 0;
 	char cwdpath[PATH_MAX];
 	const char *cwd;
+	
         #if defined(USE_BSD_AUTH)
 	char *login_style = NULL;
         #endif
+	
 	char **envp;
 
 	setprogname("doas");
@@ -319,12 +325,6 @@ main(int argc, char **argv)
 		case 'C':
 			confpath = optarg;
 			break;
-/*		case 'L':
-			i = open("/dev/tty", O_RDWR);
-			if (i != -1)
-				ioctl(i, TIOCCLRVERAUTH);
-			exit(i != -1);
-*/
 		case 'u':
 			if (strlcpy(targetname, optarg, sizeof(targetname)) >= sizeof(targetname))
 				errx(1, "pw_name too long");
@@ -336,6 +336,7 @@ main(int argc, char **argv)
 			break;
 		case 'S':
 			Sflag = 1;	
+			break;
 		case 's':
 			sflag = 1;
 			break;
@@ -344,6 +345,7 @@ main(int argc, char **argv)
 			break;
 		}
 	}
+	
 	argv += optind;
 	argc -= optind;
 
@@ -351,7 +353,9 @@ main(int argc, char **argv)
 		if (sflag)
 			usage();
 	} else if ((!sflag && !argc) || (sflag && argc))
+	{
 		usage();
+	}
 
 	temp_pw = getpwuid(uid);
         original_pw = copyenvpw(temp_pw);
@@ -424,8 +428,6 @@ main(int argc, char **argv)
 } while (/*CONSTCOND*/0)
 		pam_handle_t *pamh = NULL;
 		int pam_err;
-
-/* #ifndef __linux__ */
 		int temp_stdin;
 
 		/* openpam_ttyconv checks if stdin is a terminal and
@@ -442,7 +444,6 @@ main(int argc, char **argv)
 		if (temp_stdin == -1)
 			err(1, "dup");
 		close(STDIN_FILENO);
-/* #else */
 		/* force password prompt to display on stderr, not stdout */
 		int temp_stdout = dup(1);
 		if (temp_stdout == -1)
@@ -450,7 +451,6 @@ main(int argc, char **argv)
 		close(1);
 		if (dup2(2, 1) == -1)
 			err(1, "dup2");
-/* #endif */
 
 		pam_err = pam_start("doas", myname, &pamc, &pamh);
 		if (pam_err != PAM_SUCCESS) {
@@ -502,6 +502,7 @@ main(int argc, char **argv)
 		}
 		pam_end(pamh, pam_err);
 
+		
 #ifndef __linux__
 		/* Re-establish stdin */
 		if (dup2(temp_stdin, STDIN_FILENO) == -1)
@@ -518,10 +519,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-        /*
-	if (pledge("stdio rpath getpw exec id", NULL) == -1)
-		err(1, "pledge");
-        */
+	
 	if (targetname[0] == '\0')
 		temp_pw = getpwuid(target);
 	else
@@ -557,20 +555,11 @@ main(int argc, char **argv)
 		err(1, "setreuid");
 	#endif
 #endif
-        /*
-	if (pledge("stdio rpath exec", NULL) == -1)
-		err(1, "pledge");
-        */
 
 	if (getcwd(cwdpath, sizeof(cwdpath)) == NULL)
 		cwd = "(failed)";
 	else
 		cwd = cwdpath;
-
-	/*
-        if (pledge("stdio exec", NULL) == -1)
-		err(1, "pledge");
-        */
 
         /* skip logging if NOLOG is set */
         if (!(rule->options & NOLOG))
